@@ -137,14 +137,13 @@ Inductive execute : vm -> vm -> Prop :=
       execute y z ->
       execute x z.
 
+Ltac step inst :=
+  eapply execute_step; [apply inst; reflexivity | ].
+
 Example add_1_2 :
   execute (VM [IPush 1; IPush 2; IAdd; IPrinti; IEnd] [] [] [] [] 0)
           (VM [IPush 1; IPush 2; IAdd; IPrinti; IEnd] [] [] [] [IOInt 3] 5).
 Proof.
-  eapply execute_step. apply SPush. reflexivity.
-  eapply execute_step. apply SPush. reflexivity.
-  eapply execute_step. apply SAdd. reflexivity.
-  eapply execute_step. apply SPrinti. reflexivity.
-  eapply execute_step. apply SEnd. reflexivity.
-  eapply execute_refl.
+  step SPush. step SPush. step SAdd. step SPrinti. step SEnd.
+  apply execute_refl.
 Qed.
