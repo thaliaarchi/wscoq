@@ -1,7 +1,7 @@
 Require Import Coq.ZArith.ZArith.
 Require Import Coq.Lists.List.
 Import ListNotations.
-Require Import WSpace.Bin.
+Require Export WSpace.Bin.
 
 Inductive inst : Type :=
   | IPush (n : Z)
@@ -18,10 +18,10 @@ Inductive inst : Type :=
   | IStore
   | IRetrieve
   | ILabel (l : bin)
-  | ICall (l : bin)
-  | IJmp (l : bin)
-  | IJz (l : bin)
-  | IJn (l : bin)
+  | ICall (l : nat)
+  | IJmp (l : nat)
+  | IJz (l : nat)
+  | IJn (l : nat)
   | IRet
   | IEnd
   | IPrintc
@@ -39,94 +39,121 @@ Inductive vm : Type :=
        (heap : list Z)
        (stdin : list io)
        (stdout : list io)
-       (pc : nat).
-       (* callstack *)
-       (* labels *)
+       (pc : nat)
+       (calls : list nat).
 
-Definition get_program (v : vm) : list inst :=
-  match v with VM program _ _ _ _ _ => program end.
-Definition get_stack (v : vm) : list Z :=
-  match v with VM _ stack _ _ _ _ => stack end.
-Definition get_heap (v : vm) : list Z :=
-  match v with VM _ _ heap _ _ _ => heap end.
-Definition get_stdin (v : vm) : list io :=
-  match v with VM _ _ _ stdin _ _ => stdin end.
-Definition get_stdout (v : vm) : list io :=
-  match v with VM _ _ _ _ stdout _ => stdout end.
-Definition get_pc (v : vm) : nat :=
-  match v with VM _ _ _ _ _ pc => pc end.
-
-Definition get_inst (v : vm) : option inst :=
-  nth_error (get_program v) (get_pc v).
-
-Definition set_stack (v : vm) (stack : list Z) : vm :=
-  match v with VM program _ heap stdin stdout pc =>
-    VM program stack heap stdin stdout pc end.
-Definition set_heap (v : vm) (heap : list Z) : vm :=
-  match v with VM program stack _ stdin stdout pc =>
-    VM program stack heap stdin stdout pc end.
-Definition incr_pc (v : vm) : vm :=
-  match v with VM program stack heap stdin stdout pc =>
-    VM program stack heap stdin stdout (S pc) end.
+Fixpoint store (hp : list Z) (n : nat) (x : Z) : list Z :=
+  match n, hp with
+  | O, _ :: hp' => x :: hp'
+  | O, [] => [x]
+  | S n', y :: hp' => y :: store hp' n' x
+  | S n', [] => 0 :: store [] n' x
+  end.
+Definition retrieve (hp : list Z) (n : nat) : Z :=
+  nth_default 0 hp n.
 
 Inductive step : vm -> vm -> Prop :=
-  | SPush : forall prog stk hp sin sout pc n,
+  | SPush : forall prog stk hp sin sout pc calls n,
       nth_error prog pc = Some (IPush n) ->
-      step (VM prog stk hp sin sout pc)
-           (VM prog (n :: stk) hp sin sout (S pc))
-  | SDup : forall prog x stk' hp sin sout pc,
+      step (VM prog stk hp sin sout pc calls)
+           (VM prog (n :: stk) hp sin sout (S pc) calls)
+  | SDup : forall prog x stk' hp sin sout pc calls,
       nth_error prog pc = Some IDup ->
-      step (VM prog (x :: stk') hp sin sout pc)
-           (VM prog (x :: x :: stk') hp sin sout (S pc))
-  | SCopy : forall prog stk hp sin sout pc n x,
+      step (VM prog (x :: stk') hp sin sout pc calls)
+           (VM prog (x :: x :: stk') hp sin sout (S pc) calls)
+  | SCopy : forall prog stk hp sin sout pc calls n x,
       nth_error prog pc = Some (ICopy n) ->
       nth_error stk n = Some x ->
-      step (VM prog stk hp sin sout pc)
-           (VM prog (x :: stk) hp sin sout (S pc))
-  | SSwap : forall prog x y stk' hp sin sout pc,
+      step (VM prog stk hp sin sout pc calls)
+           (VM prog (x :: stk) hp sin sout (S pc) calls)
+  | SSwap : forall prog x y stk' hp sin sout pc calls,
       nth_error prog pc = Some (ISwap) ->
-      step (VM prog (x :: y :: stk') hp sin sout pc)
-           (VM prog (y :: x :: stk') hp sin sout (S pc))
-  | SDrop : forall prog x stk' hp sin sout pc,
+      step (VM prog (x :: y :: stk') hp sin sout pc calls)
+           (VM prog (y :: x :: stk') hp sin sout (S pc) calls)
+  | SDrop : forall prog x stk' hp sin sout pc calls,
       nth_error prog pc = Some (IDrop) ->
-      step (VM prog (x :: stk') hp sin sout pc)
-           (VM prog stk' hp sin sout (S pc))
-  | SSlide : forall prog x stk' hp sin sout pc n,
+      step (VM prog (x :: stk') hp sin sout pc calls)
+           (VM prog stk' hp sin sout (S pc) calls)
+  | SSlide : forall prog x stk' hp sin sout pc calls n,
       nth_error prog pc = Some (ISlide n) ->
-      step (VM prog (x :: stk') hp sin sout pc)
-           (VM prog (x :: skipn n stk') hp sin sout (S pc))
-  | SAdd : forall prog x y stk' hp sin sout pc,
+      step (VM prog (x :: stk') hp sin sout pc calls)
+           (VM prog (x :: skipn n stk') hp sin sout (S pc) calls)
+  | SAdd : forall prog y x stk' hp sin sout pc calls,
       nth_error prog pc = Some IAdd ->
-      step (VM prog (x :: y :: stk') hp sin sout pc)
-           (VM prog (y + x :: stk') hp sin sout (S pc))
-  | SSub : forall prog x y stk' hp sin sout pc,
+      step (VM prog (y :: x :: stk') hp sin sout pc calls)
+           (VM prog (x + y :: stk') hp sin sout (S pc) calls)
+  | SSub : forall prog y x stk' hp sin sout pc calls,
       nth_error prog pc = Some ISub ->
-      step (VM prog (x :: y :: stk') hp sin sout pc)
-           (VM prog (y - x :: stk') hp sin sout (S pc))
-  | SMul : forall prog x y stk' hp sin sout pc,
+      step (VM prog (y :: x :: stk') hp sin sout pc calls)
+           (VM prog (x - y :: stk') hp sin sout (S pc) calls)
+  | SMul : forall prog y x stk' hp sin sout pc calls,
       nth_error prog pc = Some IMul ->
-      step (VM prog (x :: y :: stk') hp sin sout pc)
-           (VM prog (y * x :: stk') hp sin sout (S pc))
-  | SDiv : forall prog x y stk' hp sin sout pc,
+      step (VM prog (y :: x :: stk') hp sin sout pc calls)
+           (VM prog (x * y :: stk') hp sin sout (S pc) calls)
+  | SDiv : forall prog y x stk' hp sin sout pc calls,
       nth_error prog pc = Some IDiv ->
-      step (VM prog (x :: y :: stk') hp sin sout pc)
-           (VM prog (y / x :: stk') hp sin sout (S pc))
-  | SMod : forall prog x y stk' hp sin sout pc,
+      step (VM prog (y :: x :: stk') hp sin sout pc calls)
+           (VM prog (x / y :: stk') hp sin sout (S pc) calls)
+  | SMod : forall prog y x stk' hp sin sout pc calls,
       nth_error prog pc = Some IMod ->
-      step (VM prog (x :: y :: stk') hp sin sout pc)
-           (VM prog (y mod x :: stk') hp sin sout (S pc))
-  | SEnd : forall prog stk hp sin sout pc,
+      step (VM prog (y :: x :: stk') hp sin sout pc calls)
+           (VM prog (x mod y :: stk') hp sin sout (S pc) calls)
+  | SStore : forall prog y x n stk' hp sin sout pc calls,
+      nth_error prog pc = Some IStore ->
+      Z_to_nat x = Some n ->
+      step (VM prog (y :: x :: stk') hp sin sout pc calls)
+           (VM prog stk' (store hp n y) sin sout (S pc) calls)
+  | SRetrieve : forall prog x n stk' hp sin sout pc calls,
+      nth_error prog pc = Some IRetrieve ->
+      Z_to_nat x = Some n ->
+      step (VM prog (x :: stk') hp sin sout pc calls)
+           (VM prog (retrieve hp n :: stk') hp sin sout (S pc) calls)
+  | SLabel : forall prog stk hp sin sout pc calls l,
+      nth_error prog pc = Some (ILabel l) ->
+      step (VM prog stk hp sin sout pc calls)
+           (VM prog stk hp sin sout (S pc) calls)
+  | SCall : forall prog stk hp sin sout pc calls l,
+      nth_error prog pc = Some (ICall l) ->
+      step (VM prog stk hp sin sout pc calls)
+           (VM prog stk hp sin sout l (S pc :: calls))
+  | SJmp : forall prog stk hp sin sout pc calls l,
+      nth_error prog pc = Some (IJmp l) ->
+      step (VM prog stk hp sin sout pc calls)
+           (VM prog stk hp sin sout l calls)
+  | SJz : forall prog x stk' hp sin sout pc calls l,
+      nth_error prog pc = Some (IJz l) ->
+      step (VM prog (x :: stk') hp sin sout pc calls)
+           (VM prog stk' hp sin sout (if x =? 0 then l else S pc) calls)
+  | SJn : forall prog x stk' hp sin sout pc calls l,
+      nth_error prog pc = Some (IJn l) ->
+      step (VM prog (x :: stk') hp sin sout pc calls)
+           (VM prog stk' hp sin sout (if x <? 0 then l else S pc) calls)
+  | SRet : forall prog stk hp sin sout pc l calls,
+      nth_error prog pc = Some IRet ->
+      step (VM prog stk hp sin sout pc (l :: calls))
+           (VM prog stk hp sin sout l calls)
+  | SEnd : forall prog stk hp sin sout pc calls,
       nth_error prog pc = Some IEnd ->
-      step (VM prog stk hp sin sout pc)
-           (VM prog stk hp sin sout (length prog))
-  | SPrintc : forall prog x stk' hp sin sout pc,
+      step (VM prog stk hp sin sout pc calls)
+           (VM prog stk hp sin sout (length prog) calls)
+  | SPrintc : forall prog x stk' hp sin sout pc calls,
       nth_error prog pc = Some IPrintc ->
-      step (VM prog (x :: stk') hp sin sout pc)
-           (VM prog stk' hp sin (IOChar x :: sout) (S pc))
-  | SPrinti : forall prog x stk' hp sin sout pc,
+      step (VM prog (x :: stk') hp sin sout pc calls)
+           (VM prog stk' hp sin (IOChar x :: sout) (S pc) calls)
+  | SPrinti : forall prog v stk' hp sin sout pc calls,
       nth_error prog pc = Some IPrinti ->
-      step (VM prog (x :: stk') hp sin sout pc)
-           (VM prog stk' hp sin (IOInt x :: sout) (S pc)).
+      step (VM prog (v :: stk') hp sin sout pc calls)
+           (VM prog stk' hp sin (IOInt v :: sout) (S pc) calls)
+  | SReadc : forall prog x n stk' hp v sin sout pc calls,
+      nth_error prog pc = Some IReadc ->
+      Z_to_nat x = Some n ->
+      step (VM prog (x :: stk') hp (IOChar v :: sin) sout pc calls)
+           (VM prog stk' (store hp n v) sin sout (S pc) calls)
+  | SReadi : forall prog x n stk' hp v sin sout pc calls,
+      nth_error prog pc = Some IReadi ->
+      Z_to_nat x = Some n ->
+      step (VM prog (x :: stk') hp (IOInt v :: sin) sout pc calls)
+           (VM prog stk' (store hp n v) sin sout (S pc) calls).
 
 (* Equivalent to clos_refl_trans_1n in Coq.Relations.Relation_Operators. *)
 Inductive execute : vm -> vm -> Prop :=
@@ -138,12 +165,90 @@ Inductive execute : vm -> vm -> Prop :=
       execute x z.
 
 Ltac step inst :=
-  eapply execute_step; [apply inst; reflexivity | ].
+  eapply execute_step; [eapply inst; reflexivity | cbn].
 
 Example add_1_2 :
-  execute (VM [IPush 1; IPush 2; IAdd; IPrinti; IEnd] [] [] [] [] 0)
-          (VM [IPush 1; IPush 2; IAdd; IPrinti; IEnd] [] [] [] [IOInt 3] 5).
+  let prog := [IPush 1; IPush 2; IAdd; IPrinti; IEnd] in
+  execute (VM prog [] [] [] [] 0 [])
+          (VM prog [] [] [] [IOInt 3] 5 []).
 Proof.
   step SPush. step SPush. step SAdd. step SPrinti. step SEnd.
+  apply execute_refl.
+Qed.
+
+Example count :
+  let prog := [
+    IPush 1;
+    ILabel [B1; B1; B0; B0; B0; B0; B1; B0]; (* C *)
+    IDup; IPrinti;
+    IPush 10; IPrintc;
+    IPush 1; IAdd;
+    IDup; IPush 11; ISub; IJz 13;
+    IJmp 1;
+    ILabel [B1; B0; B1; B0; B0; B0; B1; B0]; (* E *)
+    IDrop;
+    IEnd] in
+  execute (VM prog [] [] [] [] 0 [])
+          (VM prog [] [] []
+              [IOChar 10; IOInt 10; IOChar 10; IOInt 9; IOChar 10; IOInt 8;
+               IOChar 10; IOInt 7; IOChar 10; IOInt 6; IOChar 10; IOInt 5;
+               IOChar 10; IOInt 4; IOChar 10; IOInt 3; IOChar 10; IOInt 2;
+               IOChar 10; IOInt 1] 16 []).
+Proof.
+  step SPush.
+  repeat (step SLabel; step SDup; step SPrinti; step SPush; step SPrintc;
+      step SPush; step SAdd; step SDup; step SPush; step SSub; step SJz;
+      try step SJmp).
+  step SLabel. step SDrop. step SEnd.
+  apply execute_refl.
+Qed.
+
+Example fibonacci :
+  let prog := [
+    IPush 72; IPrintc;
+    IPush 111; IPrintc;
+    IPush 119; IPrintc;
+    IPush 32; IPrintc;
+    IPush 109; IPrintc;
+    IPush 97; IPrintc;
+    IPush 110; IPrintc;
+    IPush 121; IPrintc;
+    IPush 63; IPrintc;
+    IPush 32; IPrintc;
+    IPush 2; IReadi;
+    IPush 0;
+    IPush 1;
+    IDup; IPrinti;
+    IPush 10; IPrintc;
+    ILabel [B1]; (* 1 *)
+    IDup; IPush 1; ISwap; IStore;
+    IAdd;
+    IPush 1; IRetrieve;
+    ISwap;
+    IDup; IPrinti;
+    IPush 10; IPrintc;
+    IPush 2; IRetrieve;
+    IPush 1; ISub;
+    IDup; IPush 2; ISwap; IStore;
+    IJn 51; (* 2 *)
+    IJmp 28; (* 1 *)
+    ILabel [B0; B1]; (* 2 *)
+    IEnd] in
+  execute (VM prog [] [] [IOInt 5] [] 0 [])
+          (VM prog [13; 8] [0; 8; -1] []
+              [IOChar 10; IOInt 13; IOChar 10; IOInt 8; IOChar 10; IOInt 5;
+               IOChar 10; IOInt 3; IOChar 10; IOInt 2; IOChar 10; IOInt 1;
+               IOChar 10; IOInt 1; IOChar 32; IOChar 63; IOChar 121; IOChar 110;
+               IOChar 97; IOChar 109; IOChar 32; IOChar 119; IOChar 111;
+               IOChar 72] 53 []).
+Proof.
+  repeat (step SPush; step SPrintc). step SPush. step SReadi.
+  step SPush. step SPush. step SDup. step SPrinti. step SPush. step SPrintc.
+  repeat (step SLabel; step SDup; step SPush; step SSwap; step SStore;
+      step SAdd; step SPush; step SRetrieve; step SSwap; step SDup;
+      step SPrinti; step SPush; step SPrintc; step SPush; step SRetrieve;
+      step SPush; step SSub; step SDup; step SPush; step SSwap; step SStore;
+      step SJn; try step SJmp).
+  step SLabel. step SEnd.
   apply execute_refl.
 Qed.

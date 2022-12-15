@@ -66,3 +66,23 @@ Definition bin_to_string (b : bin) : option string :=
     | _ => None
     end in
   bin_to_string b EmptyString.
+
+Fixpoint positive_to_nat (p : positive) : nat :=
+  match p with
+  | xH => 1
+  | xO p' => 2 * positive_to_nat p'
+  | xI p' => 1 + 2 * positive_to_nat p'
+  end.
+
+Definition Z_to_nat (z : Z) : option nat :=
+  match z with
+  | Z0 => Some O
+  | Zpos p => Some (positive_to_nat p)
+  | Zneg _ => None
+  end.
+
+Definition N_to_nat (n : N) : nat :=
+  match n with
+  | N0 => 0
+  | Npos p => positive_to_nat p
+  end.
