@@ -164,17 +164,15 @@ Inductive execute : vm -> vm -> Prop :=
       execute y z ->
       execute x z.
 
-Ltac step inst :=
-  eapply execute_step; [eapply inst; reflexivity | cbn].
+Ltac execute :=
+  repeat (eapply execute_step; [econstructor; reflexivity | cbn]);
+  apply execute_refl.
 
 Example add_1_2 :
   let prog := [IPush 1; IPush 2; IAdd; IPrinti; IEnd] in
   execute (VM prog [] [] [] [] 0 [])
           (VM prog [] [] [] [IOInt 3] 5 []).
-Proof.
-  step SPush. step SPush. step SAdd. step SPrinti. step SEnd.
-  apply execute_refl.
-Qed.
+Proof. execute. Qed.
 
 Example count :
   let prog := [
@@ -194,14 +192,7 @@ Example count :
                IOChar 10; IOInt 7; IOChar 10; IOInt 6; IOChar 10; IOInt 5;
                IOChar 10; IOInt 4; IOChar 10; IOInt 3; IOChar 10; IOInt 2;
                IOChar 10; IOInt 1] 16 []).
-Proof.
-  step SPush.
-  repeat (step SLabel; step SDup; step SPrinti; step SPush; step SPrintc;
-      step SPush; step SAdd; step SDup; step SPush; step SSub; step SJz;
-      try step SJmp).
-  step SLabel. step SDrop. step SEnd.
-  apply execute_refl.
-Qed.
+Proof. execute. Qed.
 
 Example fibonacci :
   let prog := [
@@ -241,14 +232,4 @@ Example fibonacci :
                IOChar 10; IOInt 1; IOChar 32; IOChar 63; IOChar 121; IOChar 110;
                IOChar 97; IOChar 109; IOChar 32; IOChar 119; IOChar 111;
                IOChar 72] 53 []).
-Proof.
-  repeat (step SPush; step SPrintc). step SPush. step SReadi.
-  step SPush. step SPush. step SDup. step SPrinti. step SPush. step SPrintc.
-  repeat (step SLabel; step SDup; step SPush; step SSwap; step SStore;
-      step SAdd; step SPush; step SRetrieve; step SSwap; step SDup;
-      step SPrinti; step SPush; step SPrintc; step SPush; step SRetrieve;
-      step SPush; step SSub; step SDup; step SPush; step SSwap; step SStore;
-      step SJn; try step SJmp).
-  step SLabel. step SEnd.
-  apply execute_refl.
-Qed.
+Proof. execute. Qed.
