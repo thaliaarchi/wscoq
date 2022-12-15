@@ -178,13 +178,13 @@ Proof. execute. Qed.
 Example count :
   let prog := [
     IPush 1;
-    ILabel (string_to_bin "C");
+    ILabel (Bin.of_string "C");
     IDup; IPrinti;
     IPush 10; IPrintc;
     IPush 1; IAdd;
     IDup; IPush 11; ISub; IJz 13;
     IJmp 1;
-    ILabel (string_to_bin "E");
+    ILabel (Bin.of_string "E");
     IDrop;
     IEnd] in
   execute (VM prog [] [] [] [] 0 [])
@@ -212,7 +212,7 @@ Example fibonacci :
     IPush 1;
     IDup; IPrinti;
     IPush 10; IPrintc;
-    ILabel (nat_to_bin 1);
+    ILabel (Bin.of_nat 1);
     IDup; IPush 1; ISwap; IStore;
     IAdd;
     IPush 1; IRetrieve;
@@ -224,7 +224,7 @@ Example fibonacci :
     IDup; IPush 2; ISwap; IStore;
     IJn 51; (* 2 *)
     IJmp 28; (* 1 *)
-    ILabel (nat_to_bin 2);
+    ILabel (Bin.of_nat 2);
     IEnd] in
   execute (VM prog [] [] [IOInt 5] [] 0 [])
           (VM prog [13; 8] [0; 8; -1] []

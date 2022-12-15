@@ -11,27 +11,27 @@ Inductive bit : Type :=
 
 Definition bin : Type := list bit.
 
-Fixpoint incr_bin (b : bin) : bin :=
+Fixpoint incr (b : bin) : bin :=
   match b with
   | [] => [B1]
   | B0 :: b' => B1 :: b'
-  | B1 :: b' => B0 :: (incr_bin b')
+  | B1 :: b' => B0 :: (incr b')
   end.
 
-Fixpoint bin_to_nat (b : bin) : nat :=
+Fixpoint to_nat (b : bin) : nat :=
   match b with
   | [] => 0
-  | B0 :: b' => 2 * bin_to_nat b'
-  | B1 :: b' => 1 + 2 * bin_to_nat b'
+  | B0 :: b' => 2 * to_nat b'
+  | B1 :: b' => 1 + 2 * to_nat b'
   end.
 
-Fixpoint nat_to_bin (n : nat) : bin :=
+Fixpoint of_nat (n : nat) : bin :=
   match n with
   | O => [B0]
-  | S n' => incr_bin (nat_to_bin n')
+  | S n' => incr (of_nat n')
   end.
 
-Fixpoint bin_to_positive (b : bin) : option positive :=
+Fixpoint to_positive (b : bin) : option positive :=
   let fix digits_to_positive (b : bin) : positive :=
     match b with
     | [] => xH
@@ -40,41 +40,41 @@ Fixpoint bin_to_positive (b : bin) : option positive :=
     end in
   match b with
   | [] => None
-  | B0 :: b' => bin_to_positive b'
+  | B0 :: b' => to_positive b'
   | B1 :: b' => Some (digits_to_positive b')
   end.
 
-Fixpoint positive_to_bin (p : positive) : bin :=
+Fixpoint of_positive (p : positive) : bin :=
   match p with
   | xH => [B1]
-  | xO p' => B0 :: positive_to_bin p'
-  | xI p' => B0 :: positive_to_bin p'
+  | xO p' => B0 :: of_positive p'
+  | xI p' => B0 :: of_positive p'
   end.
 
-Definition bin_to_Z (b : bin) : Z :=
-  match hd B0 b, bin_to_positive (tl b) with
+Definition to_Z (b : bin) : Z :=
+  match hd B0 b, to_positive (tl b) with
   | _, None => Z0
   | B0, Some p => Zpos p
   | B1, Some p => Zneg p
   end.
 
-Definition Z_to_bin (z : Z) : bin :=
+Definition of_Z (z : Z) : bin :=
   match z with
   | Z0 => [B0]
-  | Zpos p => B0 :: positive_to_bin p
-  | Zneg p => B1 :: positive_to_bin p
+  | Zpos p => B0 :: of_positive p
+  | Zneg p => B1 :: of_positive p
   end.
 
-Definition bin_to_N (b : bin) : N :=
-  match bin_to_positive b with
+Definition to_N (b : bin) : N :=
+  match to_positive b with
   | None => N0
   | Some p => Npos p
   end.
 
-Definition N_to_bin (n : N) : bin :=
+Definition of_N (n : N) : bin :=
   match n with
   | N0 => [B0]
-  | Npos p => positive_to_bin p
+  | Npos p => of_positive p
   end.
 
 Definition bit_to_bool (b : bit) : bool :=
@@ -97,27 +97,29 @@ Theorem bool_bit_bool : forall b,
   bit_to_bool (bool_to_bit b) = b.
 Proof. intros []; reflexivity. Qed.
 
-Fixpoint bin_to_string (b : bin) : option string :=
+Definition bits_to_ascii (b0 b1 b2 b3 b4 b5 b6 b7 : bit) : ascii :=
+  Ascii (bit_to_bool b0)
+        (bit_to_bool b1)
+        (bit_to_bool b2)
+        (bit_to_bool b3)
+        (bit_to_bool b4)
+        (bit_to_bool b5)
+        (bit_to_bool b6)
+        (bit_to_bool b7).
+
+Fixpoint to_string (b : bin) : option string :=
   match b with
   | [] => Some EmptyString
   | b0 :: b1 :: b2 :: b3 :: b4 :: b5 :: b6 :: b7 :: b' =>
-      match bin_to_string b' with
+      match to_string b' with
       | None => None
       | Some s =>
-          Some (String (Ascii (bit_to_bool b0)
-                              (bit_to_bool b1)
-                              (bit_to_bool b2)
-                              (bit_to_bool b3)
-                              (bit_to_bool b4)
-                              (bit_to_bool b5)
-                              (bit_to_bool b6)
-                              (bit_to_bool b7))
-                       s)
+          Some (String (bits_to_ascii b0 b1 b2 b3 b4 b5 b6 b7) s)
       end
   | _ => None
   end.
 
-Fixpoint string_to_bin (s : string) : bin :=
+Fixpoint of_string (s : string) : bin :=
   match s with
   | EmptyString => []
   | String (Ascii b0 b1 b2 b3 b4 b5 b6 b7) s' =>
@@ -129,7 +131,7 @@ Fixpoint string_to_bin (s : string) : bin :=
           bool_to_bit b5 ::
           bool_to_bit b6 ::
           bool_to_bit b7 ::
-          string_to_bin s'
+          of_string s'
   end.
 
 Theorem bin_string_bin : forall b s,
@@ -142,12 +144,12 @@ Proof.
     induction b'. cbn in *. Admitted.
 
 Theorem string_bin_string : forall s,
-  bin_to_string (string_to_bin s) = Some s.
+  to_string (of_string s) = Some s.
 Proof.
   induction s.
   - reflexivity.
-  - destruct a. cbn. repeat rewrite bool_bit_bool.
-    rewrite IHs. reflexivity.
+  - destruct a. cbn. rewrite IHs.
+    unfold bits_to_ascii. repeat rewrite bool_bit_bool. reflexivity.
 Qed.
 
 Fixpoint positive_to_nat (p : positive) : nat :=
