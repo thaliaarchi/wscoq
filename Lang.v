@@ -38,55 +38,113 @@ Inductive vm : Type :=
        (stack : list Z)
        (heap : list Z)
        (stdin : list io)
-       (stdout : list io).
+       (stdout : list io)
+       (pc : nat).
        (* callstack *)
        (* labels *)
 
-Definition program (v : vm) : list inst :=
-  match v with VM program _ _ _ _ => program end.
-Definition stack (v : vm) : list Z :=
-  match v with VM _ stack _ _ _ => stack end.
-Definition heap (v : vm) : list Z :=
-  match v with VM _ _ heap _ _ => heap end.
-Definition stdin (v : vm) : list io :=
-  match v with VM _ _ _ stdin _ => stdin end.
-Definition stdout (v : vm) : list io :=
-  match v with VM _ _ _ _ stdout => stdout end.
+Definition get_program (v : vm) : list inst :=
+  match v with VM program _ _ _ _ _ => program end.
+Definition get_stack (v : vm) : list Z :=
+  match v with VM _ stack _ _ _ _ => stack end.
+Definition get_heap (v : vm) : list Z :=
+  match v with VM _ _ heap _ _ _ => heap end.
+Definition get_stdin (v : vm) : list io :=
+  match v with VM _ _ _ stdin _ _ => stdin end.
+Definition get_stdout (v : vm) : list io :=
+  match v with VM _ _ _ _ stdout _ => stdout end.
+Definition get_pc (v : vm) : nat :=
+  match v with VM _ _ _ _ _ pc => pc end.
 
-Definition set_stack (v : vm) (new_stack : list Z) : vm :=
-  match v with
-  | VM program stack heap stdin stdout =>
-      VM program new_stack heap stdin stdout
-  end.
-Definition execute_arith (v : vm) (f : Z -> Z -> Z) : option vm :=
-  match stack v with
-  | y :: x :: stk => Some (set_stack v (f x y :: stk))
-  | _ => None
-  end.
-Definition execute_print (v : vm) (f : Z -> io) : option vm :=
-  match v with
-  | VM program (x :: stk) heap stdin stdout =>
-      Some (VM program stk heap stdin (f x :: stdout))
-  | _ => None
-  end.
+Definition get_inst (v : vm) : option inst :=
+  nth_error (get_program v) (get_pc v).
 
-Definition execute_inst (v : vm) (i : inst) : option vm :=
-  match i, stack v with
-  | IPush n, stk         => Some (set_stack v (n :: stk))
-  | IDup, x :: stk       => Some (set_stack v (x :: x :: stk))
-  | ICopy n, stk         => match nth_error stk n with
-                            | Some x => Some (set_stack v (x :: stk))
-                            | None => None
-                            end
-  | ISwap, y :: x :: stk => Some (set_stack v (x :: y :: stk))
-  | IDrop, x :: stk      => Some (set_stack v (stk))
-  | ISlide n, x :: stk   => Some (set_stack v (x :: skipn n stk))
-  | IAdd, _              => execute_arith v Z.add
-  | ISub, _              => execute_arith v Z.sub
-  | IMul, _              => execute_arith v Z.mul
-  | IDiv, _              => execute_arith v Z.div
-  | IMod, _              => execute_arith v Z.modulo
-  | IPrintc, _           => execute_print v IOChar
-  | IPrinti, _           => execute_print v IOInt
-  | _, _                 => None
-  end.
+Definition set_stack (v : vm) (stack : list Z) : vm :=
+  match v with VM program _ heap stdin stdout pc =>
+    VM program stack heap stdin stdout pc end.
+Definition set_heap (v : vm) (heap : list Z) : vm :=
+  match v with VM program stack _ stdin stdout pc =>
+    VM program stack heap stdin stdout pc end.
+Definition incr_pc (v : vm) : vm :=
+  match v with VM program stack heap stdin stdout pc =>
+    VM program stack heap stdin stdout (S pc) end.
+
+Inductive step : vm -> vm -> Prop :=
+  | SPush : forall prog stk hp sin sout pc n,
+      nth_error prog pc = Some (IPush n) ->
+      step (VM prog stk hp sin sout pc)
+           (VM prog (n :: stk) hp sin sout (S pc))
+  | SDup : forall prog x stk' hp sin sout pc,
+      nth_error prog pc = Some IDup ->
+      step (VM prog (x :: stk') hp sin sout pc)
+           (VM prog (x :: x :: stk') hp sin sout (S pc))
+  | SCopy : forall prog stk hp sin sout pc n x,
+      nth_error prog pc = Some (ICopy n) ->
+      nth_error stk n = Some x ->
+      step (VM prog stk hp sin sout pc)
+           (VM prog (x :: stk) hp sin sout (S pc))
+  | SSwap : forall prog x y stk' hp sin sout pc,
+      nth_error prog pc = Some (ISwap) ->
+      step (VM prog (x :: y :: stk') hp sin sout pc)
+           (VM prog (y :: x :: stk') hp sin sout (S pc))
+  | SDrop : forall prog x stk' hp sin sout pc,
+      nth_error prog pc = Some (IDrop) ->
+      step (VM prog (x :: stk') hp sin sout pc)
+           (VM prog stk' hp sin sout (S pc))
+  | SSlide : forall prog x stk' hp sin sout pc n,
+      nth_error prog pc = Some (ISlide n) ->
+      step (VM prog (x :: stk') hp sin sout pc)
+           (VM prog (x :: skipn n stk') hp sin sout (S pc))
+  | SAdd : forall prog x y stk' hp sin sout pc,
+      nth_error prog pc = Some IAdd ->
+      step (VM prog (x :: y :: stk') hp sin sout pc)
+           (VM prog (y + x :: stk') hp sin sout (S pc))
+  | SSub : forall prog x y stk' hp sin sout pc,
+      nth_error prog pc = Some ISub ->
+      step (VM prog (x :: y :: stk') hp sin sout pc)
+           (VM prog (y - x :: stk') hp sin sout (S pc))
+  | SMul : forall prog x y stk' hp sin sout pc,
+      nth_error prog pc = Some IMul ->
+      step (VM prog (x :: y :: stk') hp sin sout pc)
+           (VM prog (y * x :: stk') hp sin sout (S pc))
+  | SDiv : forall prog x y stk' hp sin sout pc,
+      nth_error prog pc = Some IDiv ->
+      step (VM prog (x :: y :: stk') hp sin sout pc)
+           (VM prog (y / x :: stk') hp sin sout (S pc))
+  | SMod : forall prog x y stk' hp sin sout pc,
+      nth_error prog pc = Some IMod ->
+      step (VM prog (x :: y :: stk') hp sin sout pc)
+           (VM prog (y mod x :: stk') hp sin sout (S pc))
+  | SEnd : forall prog stk hp sin sout pc,
+      nth_error prog pc = Some IEnd ->
+      step (VM prog stk hp sin sout pc)
+           (VM prog stk hp sin sout (length prog))
+  | SPrintc : forall prog x stk' hp sin sout pc,
+      nth_error prog pc = Some IPrintc ->
+      step (VM prog (x :: stk') hp sin sout pc)
+           (VM prog stk' hp sin (IOChar x :: sout) (S pc))
+  | SPrinti : forall prog x stk' hp sin sout pc,
+      nth_error prog pc = Some IPrinti ->
+      step (VM prog (x :: stk') hp sin sout pc)
+           (VM prog stk' hp sin (IOInt x :: sout) (S pc)).
+
+(* Equivalent to clos_refl_trans_1n in Coq.Relations.Relation_Operators. *)
+Inductive execute : vm -> vm -> Prop :=
+  | execute_refl : forall (x : vm),
+      execute x x
+  | execute_step : forall (x y z : vm),
+      step x y ->
+      execute y z ->
+      execute x z.
+
+Example add_1_2 :
+  execute (VM [IPush 1; IPush 2; IAdd; IPrinti; IEnd] [] [] [] [] 0)
+          (VM [IPush 1; IPush 2; IAdd; IPrinti; IEnd] [] [] [] [IOInt 3] 5).
+Proof.
+  eapply execute_step. apply SPush. reflexivity.
+  eapply execute_step. apply SPush. reflexivity.
+  eapply execute_step. apply SAdd. reflexivity.
+  eapply execute_step. apply SPrinti. reflexivity.
+  eapply execute_step. apply SEnd. reflexivity.
+  eapply execute_refl.
+Qed.
