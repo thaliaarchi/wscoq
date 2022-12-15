@@ -1,4 +1,5 @@
 Require Import Coq.ZArith.ZArith.
+Require Import Coq.Strings.String.
 Require Import Coq.Lists.List.
 Import ListNotations.
 Require Export WSpace.Bin.
@@ -177,13 +178,13 @@ Proof. execute. Qed.
 Example count :
   let prog := [
     IPush 1;
-    ILabel [B1; B1; B0; B0; B0; B0; B1; B0]; (* C *)
+    ILabel (string_to_bin "C");
     IDup; IPrinti;
     IPush 10; IPrintc;
     IPush 1; IAdd;
     IDup; IPush 11; ISub; IJz 13;
     IJmp 1;
-    ILabel [B1; B0; B1; B0; B0; B0; B1; B0]; (* E *)
+    ILabel (string_to_bin "E");
     IDrop;
     IEnd] in
   execute (VM prog [] [] [] [] 0 [])
@@ -211,7 +212,7 @@ Example fibonacci :
     IPush 1;
     IDup; IPrinti;
     IPush 10; IPrintc;
-    ILabel [B1]; (* 1 *)
+    ILabel (nat_to_bin 1);
     IDup; IPush 1; ISwap; IStore;
     IAdd;
     IPush 1; IRetrieve;
@@ -223,7 +224,7 @@ Example fibonacci :
     IDup; IPush 2; ISwap; IStore;
     IJn 51; (* 2 *)
     IJmp 28; (* 1 *)
-    ILabel [B0; B1]; (* 2 *)
+    ILabel (nat_to_bin 2);
     IEnd] in
   execute (VM prog [] [] [IOInt 5] [] 0 [])
           (VM prog [13; 8] [0; 8; -1] []
