@@ -99,3 +99,39 @@ Fixpoint parse (cs : list char) : list token :=
   | [] => []
   | _ => [TError]
   end.
+
+Fixpoint bin_to_chars (b : bin) : list char :=
+  match b with
+  | [] => [LF]
+  | B0 :: b' => Space :: bin_to_chars b'
+  | B1 :: b' => Tab :: bin_to_chars b'
+  end.
+
+Definition token_to_chars (t : token) : list char :=
+  match t with
+  | TPush n => Space :: Space :: bin_to_chars n
+  | TDup => [Space; LF; Space]
+  | TCopy n => Space :: Tab :: Space :: bin_to_chars n
+  | TSwap => [Space; LF; Tab]
+  | TDrop => [Space; LF; LF]
+  | TSlide n => Space :: Tab :: LF :: bin_to_chars n
+  | TAdd => [Tab; Space; Space; Space]
+  | TSub => [Tab; Space; Space; Tab]
+  | TMul => [Tab; Space; Space; LF]
+  | TDiv => [Tab; Space; Tab; Space]
+  | TMod => [Tab; Space; Tab; Tab]
+  | TStore => [Tab; Tab; Space]
+  | TRetrieve => [Tab; Tab; Tab]
+  | TLabel l => LF :: Space :: Space :: bin_to_chars l
+  | TCall l => LF :: Space :: Tab :: bin_to_chars l
+  | TJmp l => LF :: Space :: LF :: bin_to_chars l
+  | TJz l => LF :: Tab :: Space :: bin_to_chars l
+  | TJn l => LF :: Tab :: Tab :: bin_to_chars l
+  | TRet => [LF; Tab; LF]
+  | TEnd => [LF; LF; LF]
+  | TPrintc => [Tab; LF; Space; Space]
+  | TPrinti => [Tab; LF; Space; Tab]
+  | TReadc => [Tab; LF; Tab; Space]
+  | TReadi => [Tab; LF; Tab; Tab]
+  | TError => []
+  end.
