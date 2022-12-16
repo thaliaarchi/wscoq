@@ -18,6 +18,14 @@ Fixpoint incr (b : bin) : bin :=
   | B1 :: b' => B0 :: (incr b')
   end.
 
+Fixpoint incr_signed (b : bin) : bin :=
+  match b with
+  | [] | [B0] => [B1; B0]
+  | [B1] => [B1; B1]
+  | B0 :: b' => B1 :: b'
+  | B1 :: b' => B0 :: (incr_signed b')
+  end.
+
 Fixpoint to_nat (b : bin) : nat :=
   match b with
   | [] => 0
@@ -29,6 +37,12 @@ Fixpoint of_nat (n : nat) : bin :=
   match n with
   | O => [B0]
   | S n' => incr (of_nat n')
+  end.
+
+Fixpoint of_nat_signed (n : nat) : bin :=
+  match n with
+  | O => [B0; B0]
+  | S n' => incr_signed (of_nat_signed n')
   end.
 
 Fixpoint to_positive (b : bin) : option positive :=
