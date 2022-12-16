@@ -99,29 +99,3 @@ Fixpoint parse (cs : list char) : list token :=
   | [] => []
   | _ => [TError]
   end.
-
-Example count :
-  let src := "CountSfromS1StoT10LLSSSTSSSSTTLSLSTLSTSSSTSTSLTLSSSSSTLTSSSSLSSSSTSTTLTSSTLTSSTSSSTSTLLSLSTSSSSTTLLSSSTSSSTSTLSLLLLL"%string in
-  let chars := [Space; Space; Space; Tab; LF; LF; Space; Space; Space; Tab;
-    Space; Space; Space; Space; Tab; Tab; LF; Space; LF; Space; Tab; LF; Space;
-    Tab; Space; Space; Space; Tab; Space; Tab; Space; LF; Tab; LF; Space; Space;
-    Space; Space; Space; Tab; LF; Tab; Space; Space; Space; Space; LF; Space;
-    Space; Space; Space; Tab; Space; Tab; Tab; LF; Tab; Space; Space; Tab; LF;
-    Tab; Space; Space; Tab; Space; Space; Space; Tab; Space; Tab; LF; LF; Space;
-    LF; Space; Tab; Space; Space; Space; Space; Tab; Tab; LF; LF; Space; Space;
-    Space; Tab; Space; Space; Space; Tab; Space; Tab; LF; Space; LF; LF; LF;
-    LF; LF] in
-  let tokens := [
-    TPush (Bin.of_nat_signed 1);
-    TLabel (Bin.of_string "C");
-    TDup; TPrinti;
-    TPush (Bin.of_nat_signed 10); TPrintc;
-    TPush (Bin.of_nat_signed 1); TAdd;
-    TDup; TPush (Bin.of_nat_signed 11); TSub; TJz (Bin.of_string "E");
-    TJmp (Bin.of_string "C");
-    TLabel (Bin.of_string "E");
-    TDrop;
-    TEnd] in
-  scan src map_STL = chars /\
-  parse chars = tokens.
-Proof. split; reflexivity. Qed.
